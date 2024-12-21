@@ -8,21 +8,21 @@ import subprocess
 import os
 import shutil
 
-# %%
-# Load the image
-img = cv.imread("photos\\old_w_scratch\\d.png", cv.IMREAD_COLOR)
-# Convert the image to RGB
-img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
+# # %%
+# # Load the image
+# img = cv.imread("photos\\old_w_scratch\\d.png", cv.IMREAD_COLOR)
+# # Convert the image to RGB
+# img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
 
-# Check if the image was loaded successfully
-if img is None:
-    raise FileNotFoundError("The image file could not be found or loaded.")
+# # Check if the image was loaded successfully
+# if img is None:
+#     raise FileNotFoundError("The image file could not be found or loaded.")
 
 
-# %%
-# display the image with matplotlib
-plt.imshow(img)
-plt.show()
+# # %%
+# # display the image with matplotlib
+# plt.imshow(img)
+# plt.show()
 
 # %%
 @contextmanager
@@ -101,30 +101,50 @@ def generate_mask(image):
     return mask
     
 
-# %%
-mask = generate_mask(img)
+# # %%
+# mask = generate_mask(img)
 
-# display the mask
-plt.imshow(mask, cmap="gray")
-plt.show()
+# # display the mask
+# plt.imshow(mask, cmap="gray")
+# plt.show()
 
 
-# %%
-# now we will inpaint the scratch using the mask
-# telea inpainting
-inpainted_image = cv.inpaint(img, mask, inpaintRadius=3, flags=cv.INPAINT_TELEA)
+# # %%
+# # now we will inpaint the scratch using the mask
+# # telea inpainting
+# inpainted_image = cv.inpaint(img, mask, inpaintRadius=3, flags=cv.INPAINT_TELEA)
 
-# display the inpainted image and the original image
+# # display the inpainted image and the original image
 
-fig, ax = plt.subplots(1, 2, figsize=(15, 15))
-ax[0].imshow(img)
-ax[0].set_title("Original Image")
-ax[0].axis("off")
+# fig, ax = plt.subplots(1, 2, figsize=(15, 15))
+# ax[0].imshow(img)
+# ax[0].set_title("Original Image")
+# ax[0].axis("off")
 
-ax[1].imshow(inpainted_image)
-ax[1].set_title("Inpainted Image")
-ax[1].axis("off")
+# ax[1].imshow(inpainted_image)
+# ax[1].set_title("Inpainted Image")
+# ax[1].axis("off")
 
-plt.show()
+# plt.show()
+
+# # %%
+def inpaint_scratches(image):
+    """
+    Inpaints the scratches in the input image.
+
+    Parameters:
+        image (numpy.ndarray): Input image with scratches.
+
+    Returns:
+        numpy.ndarray: Inpainted image.
+    """
+
+    # generate the mask
+    mask = generate_mask(image)
+
+    # inpaint the image
+    inpainted_image = cv.inpaint(image, mask, inpaintRadius=3, flags=cv.INPAINT_TELEA)
+
+    return inpainted_image
 
 
