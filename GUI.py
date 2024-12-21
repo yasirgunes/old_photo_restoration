@@ -3,18 +3,48 @@ from tkinter import filedialog, messagebox
 from PIL import Image, ImageTk
 import cv2
 import os
-from utils.pipeline import pipeline
+import threading
+from utils.pipeline import pipeline  # or from pipeline import pipeline depending on your structure
 
 class PhotoRestorationGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Old Photo Restoration")
-        self.root.geometry("1200x600")
+        self.root.geometry("1200x800")  # Made taller to accommodate status list
         
         # Create frames
         self.button_frame = tk.Frame(root)
         self.button_frame.pack(pady=10)
         
+        # Create browse button
+        self.browse_button = tk.Button(
+            self.button_frame, 
+            text="Browse Image", 
+            command=self.browse_image
+        )
+        self.browse_button.pack(pady=5)
+        
+        # Create status list frame
+        self.status_frame = tk.Frame(root)
+        self.status_frame.pack(pady=5)
+        
+        # Create status labels
+        self.status_labels = []
+        self.status_steps = [
+            "1. Removing Scratches",
+            "2. Implementing noise reduction",
+            "3. Histogram Equalization",
+            "4. Adjusting sharpness",
+            "5. Adjusting brightness and contrast",
+            "6. Complete Restoration"
+        ]
+        
+        for step in self.status_steps:
+            label = tk.Label(self.status_frame, text=f"{step} (Pending...)", font=('Arial', 10))
+            label.pack(anchor='w', padx=20)
+            self.status_labels.append(label)
+        
+        # Create image frame
         self.image_frame = tk.Frame(root)
         self.image_frame.pack(pady=10)
         
@@ -31,18 +61,37 @@ class PhotoRestorationGUI:
         self.image_label2 = tk.Label(self.image_frame)
         self.image_label2.grid(row=1, column=1, padx=10)
         
-        # Create browse button
-        self.browse_button = tk.Button(
-            self.button_frame, 
-            text="Browse Image", 
-            command=self.browse_image
+        # Initialize current step
+        self.current_step = 0
+        
+    def update_status(self, status):
+        if "scratches" in status.lower():
+            self.update_step_status(0, "Done!")
+        elif "noise" in status.lower():
+            self.update_step_status(1, "Done!")
+        elif "histogram" in status.lower():
+            self.update_step_status(2, "Done!")
+        elif "sharpness" in status.lower():
+            self.update_step_status(3, "Done!")
+        elif "brightness" in status.lower():
+            self.update_step_status(4, "Done!")
+        
+        self.root.update_idletasks()
+    
+    def update_step_status(self, step_index, status):
+        # Reset all subsequent steps to "Pending..."
+        for i in range(step_index + 1, len(self.status_labels)):
+            self.status_labels[i].config(
+                text=f"{self.status_steps[i]} (Pending...)",
+                fg='black'
+            )
+        
+        # Update current step
+        self.status_labels[step_index].config(
+            text=f"{self.status_steps[step_index]} ({status})",
+            fg='green' if status == "Done!" else 'black'
         )
-        self.browse_button.pack(pady=5)
-        
-        # Create status label
-        self.status_label = tk.Label(self.button_frame, text="")
-        self.status_label.pack(pady=5)
-        
+    
     def browse_image(self):
         file_types = [
             ('Image files', '*.png *.jpg *.jpeg')
@@ -50,44 +99,66 @@ class PhotoRestorationGUI:
         file_path = filedialog.askopenfilename(filetypes=file_types)
         
         if file_path:
+            # Reset status labels
+            for i, label in enumerate(self.status_labels):
+                label.config(text=f"{self.status_steps[i]} (Pending...)", fg='black')
+            
+            # Disable browse button during processing
+            self.browse_button.config(state='disabled')
+            
             try:
-                # Read and process image
+                # Read image
                 original = cv2.imread(file_path)
                 original = cv2.cvtColor(original, cv2.COLOR_BGR2RGB)
                 
-                # Update status
-                self.status_label.config(text="Starting restoration...")
-                self.root.update_idletasks()
+                # Display original image immediately
+                self.display_image(original, self.image_label1)
                 
-                # Fix: Pass status_callback as second argument
-                restored = pipeline(original, status_callback=self.update_status)
-                
-                # Convert images to PIL format for display
-                original_pil = Image.fromarray(original)
-                restored_pil = Image.fromarray(restored)
-                
-                # Resize images to fit GUI
-                max_size = (500, 500)
-                original_pil.thumbnail(max_size)
-                restored_pil.thumbnail(max_size)
-                
-                # Convert to PhotoImage
-                self.photo1 = ImageTk.PhotoImage(original_pil)
-                self.photo2 = ImageTk.PhotoImage(restored_pil)
-                
-                # Update labels
-                self.image_label1.configure(image=self.photo1)
-                self.image_label2.configure(image=self.photo2)
-                
-                # Clear status
-                self.status_label.config(text="")
+                # Start processing in a separate thread
+                thread = threading.Thread(
+                    target=self.process_image,
+                    args=(original,)
+                )
+                thread.daemon = True
+                thread.start()
                 
             except Exception as e:
                 messagebox.showerror("Error", f"Error processing image: {str(e)}")
-                
-    def update_status(self, status):
-        self.status_label.config(text=status)
-        self.root.update_idletasks()
+                self.browse_button.config(state='normal')
+    
+    def process_image(self, original):
+        try:
+            # Process image
+            restored = pipeline(original, status_callback=self.update_status)
+            
+            # Update GUI in the main thread
+            self.root.after(0, self.display_restored_image, restored)
+            
+        except Exception as e:
+            self.root.after(0, lambda: messagebox.showerror("Error", f"Error processing image: {str(e)}"))
+        finally:
+            # Re-enable browse button
+            self.root.after(0, lambda: self.browse_button.config(state='normal'))
+    
+    def display_image(self, img, label):
+        # Convert to PIL format
+        pil_img = Image.fromarray(img)
+        
+        # Resize image
+        max_size = (500, 500)
+        pil_img.thumbnail(max_size)
+        
+        # Convert to PhotoImage
+        photo = ImageTk.PhotoImage(pil_img)
+        
+        # Update label
+        label.configure(image=photo)
+        label.image = photo  # Keep a reference!
+    
+    def display_restored_image(self, restored):
+        self.display_image(restored, self.image_label2)
+        # Update final status
+        self.update_step_status(5, "Done!")
 
 def main():
     root = tk.Tk()
