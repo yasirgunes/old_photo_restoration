@@ -6,13 +6,13 @@ def display_two_images(image1, image2, title1, title2):
 
     # Original image
     plt.subplot(1, 2, 1)
-    plt.title("Original Image")
+    plt.title(title1)
     plt.imshow(image1)
     plt.axis('off')
 
     # CLAHE equalized image
     plt.subplot(1, 2, 2)
-    plt.title("Result Image")
+    plt.title(title2)
     plt.imshow(image2)
     plt.axis('off')
 
