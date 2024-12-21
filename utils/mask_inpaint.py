@@ -151,3 +151,5 @@ def inpaint_scratches(image):
     return inpainted_image
 
 
+# %%
+
