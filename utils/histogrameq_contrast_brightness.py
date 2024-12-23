@@ -1,47 +1,4 @@
-# %%
-import cv2
-import matplotlib.pyplot as plt
-from utils.mask_inpaint import generate_mask
-
-# # Load the image and preprocess it
-# image = cv2.imread("image.png")  # Read as BGR
-# image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # Convert to RGB for display
-
-# mask = generate_mask(image)
-
-# image = cv2.inpaint(image, mask, inpaintRadius=3, flags=cv2.INPAINT_TELEA)
-
-# # %%
-# # Convert to YUV color space
-# image_yuv = cv2.cvtColor(image, cv2.COLOR_BGR2YUV)
-
-# # Create CLAHE object
-# clahe = cv2.createCLAHE(clipLimit=0.5, tileGridSize=(8, 8))
-
-# # Apply CLAHE to the Y channel
-# image_yuv[:, :, 0] = clahe.apply(image_yuv[:, :, 0])
-
-# # Convert back to RGB color space
-# image_equalized = cv2.cvtColor(image_yuv, cv2.COLOR_YUV2RGB)
-
-# # Plot the results
-# plt.figure(figsize=(12, 6))
-
-# # Original image
-# plt.subplot(1, 2, 1)
-# plt.title("Original Image")
-# plt.imshow(image_rgb)
-# plt.axis('off')
-
-# # CLAHE equalized image
-# plt.subplot(1, 2, 2)
-# plt.title("Equalized Image (CLAHE)")
-# plt.imshow(image_equalized)
-# plt.axis('off')
-
-# plt.tight_layout()
-# plt.show()
-
+import numpy as np
 
 # Function to adjust brightness and contrast
 def adjust_brightness_contrast(image, alpha=1.1, beta=2):
@@ -56,41 +13,11 @@ def adjust_brightness_contrast(image, alpha=1.1, beta=2):
     Returns:
     - Adjusted image (NumPy array).
     """
-    image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-
     # Apply the formula: new_image = alpha * image + beta
-    adjusted = cv2.convertScaleAbs(image, alpha=alpha, beta=beta)
-    adjusted = cv2.cvtColor(adjusted, cv2.COLOR_BGR2RGB)
+    adjusted = alpha * image + beta
+    adjusted = np.clip(adjusted, 0, 255).astype(np.uint8)
     return adjusted
 
-# # Load the input image
-# image = cv2.imread("image.png")
-# image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # Convert to RGB for display
-
-
-# # Adjust the image
-# adjusted_image = adjust_brightness_contrast(image_equalized)
-
-# # Plot the results
-# plt.figure(figsize=(12, 6))
-
-# # Original image
-# plt.subplot(1, 2, 1)
-# plt.title("Original Image")
-# plt.imshow(image_equalized)
-# plt.axis('off')
-
-# # Adjusted image
-# plt.subplot(1, 2, 2)
-# plt.title(f"Adjusted Image (alpha={1.1}, beta={2})")
-# plt.imshow(adjusted_image)
-# plt.axis('off')
-
-# plt.tight_layout()
-# plt.show()
-
-
-# %%
 def equalize_histogram(image, clipLimit=0.5):
     """
     Apply histogram equalization to the input image.
@@ -101,23 +28,77 @@ def equalize_histogram(image, clipLimit=0.5):
     Returns:
     - Equalized image (NumPy array).
     """
-    # if the image is in RGB format, convert it to BGR
-    if len(image.shape) == 3:
-        image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-
     # Convert to YUV color space
-    image_yuv = cv2.cvtColor(image, cv2.COLOR_BGR2YUV)
-
-    # Create CLAHE object
-    clahe = cv2.createCLAHE(clipLimit=clipLimit, tileGridSize=(8, 8))
+    image_yuv = rgb_to_yuv(image)
 
     # Apply CLAHE to the Y channel
-    image_yuv[:, :, 0] = clahe.apply(image_yuv[:, :, 0])
+    image_yuv[:, :, 0] = clahe(image_yuv[:, :, 0], clipLimit)
 
     # Convert back to RGB color space
-    image_equalized = cv2.cvtColor(image_yuv, cv2.COLOR_YUV2RGB)
-
+    image_equalized = yuv_to_rgb(image_yuv)
 
     return image_equalized
+
+def rgb_to_yuv(image):
+    """
+    Convert an RGB image to YUV color space.
+
+    Parameters:
+    - image: Input RGB image (NumPy array).
+
+    Returns:
+    - YUV image (NumPy array).
+    """
+    m = np.array([[0.299, 0.587, 0.114],
+                  [-0.14713, -0.28886, 0.436],
+                  [0.615, -0.51499, -0.10001]])
+    yuv = np.dot(image, m.T)
+    yuv[:, :, 1:] += 128.0
+    return yuv
+
+def yuv_to_rgb(image):
+    """
+    Convert a YUV image to RGB color space.
+
+    Parameters:
+    - image: Input YUV image (NumPy array).
+
+    Returns:
+    - RGB image (NumPy array).
+    """
+    m = np.array([[1.0, 0.0, 1.13983],
+                  [1.0, -0.39465, -0.58060],
+                  [1.0, 2.03211, 0.0]])
+    rgb = np.dot(image, m.T)
+    rgb[:, :, 1:] -= 128.0
+    return np.clip(rgb, 0, 255).astype(np.uint8)
+
+def clahe(channel, clipLimit):
+    """
+    Apply CLAHE (Contrast Limited Adaptive Histogram Equalization) to a single channel.
+
+    Parameters:
+    - channel: Input channel (NumPy array).
+    - clipLimit: Clipping limit for CLAHE.
+
+    Returns:
+    - Equalized channel (NumPy array).
+    """
+    hist, bins = np.histogram(channel.flatten(), 256, [0, 256])
+    cdf = hist.cumsum()
+    cdf_normalized = cdf * hist.max() / cdf.max()
+
+    # Clip the histogram
+    cdf_clipped = np.clip(cdf, 0, clipLimit * cdf.max())
+    cdf_clipped = cdf_clipped * (cdf.max() / cdf_clipped.max())
+
+    # Normalize the histogram
+    cdf_normalized = (cdf_clipped - cdf_clipped.min()) * 255 / (cdf_clipped.max() - cdf_clipped.min())
+    cdf_normalized = cdf_normalized.astype('uint8')
+
+    # Map the original channel values to the equalized values
+    equalized_channel = cdf_normalized[channel]
+
+    return equalized_channel
 
 

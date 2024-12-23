@@ -17,20 +17,20 @@ def noise_reduction(image):
     :param image: input image
     :return: noise reduced image
     """
-    img_noise = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-    img_noise_rgb = cv2.cvtColor(img_noise, cv2.COLOR_BGR2RGB)
+    img_noise = rgb_to_bgr(image)
+    img_noise_rgb = bgr_to_rgb(img_noise)
 
     gaussian_blur = cv2.GaussianBlur(img_noise, (5, 5), 0)
-    gaussian_blur_rgb = cv2.cvtColor(gaussian_blur, cv2.COLOR_BGR2RGB)
+    gaussian_blur_rgb = bgr_to_rgb(gaussian_blur)
 
     median_blur = cv2.medianBlur(img_noise, 5)
-    median_blur_rgb = cv2.cvtColor(median_blur, cv2.COLOR_BGR2RGB)
+    median_blur_rgb = bgr_to_rgb(median_blur)
 
     bilateral_filter = cv2.bilateralFilter(img_noise, 9, 75, 75)
-    bilateral_filter_rgb = cv2.cvtColor(bilateral_filter, cv2.COLOR_BGR2RGB)
+    bilateral_filter_rgb = bgr_to_rgb(bilateral_filter)
 
     nonlocal_mean = cv2.fastNlMeansDenoisingColored(img_noise, None, 10, 10, 7, 21)
-    nonlocal_mean_rgb = cv2.cvtColor(nonlocal_mean, cv2.COLOR_BGR2RGB)
+    nonlocal_mean_rgb = bgr_to_rgb(nonlocal_mean)
 
     plt.figure(figsize=(14,8))
     tup = [
@@ -54,111 +54,185 @@ def noise_reduction(image):
 # %%
 # noise_reduction("old_photo_02.jpg")
 
+import numpy as np
 
-def adaptive_noise_reduction(image):
+def rgb_to_bgr(image):
+    """Convert RGB to BGR"""
+    return image[:, :, ::-1]
+
+def bgr_to_rgb(image):
+    """Convert BGR to RGB"""
+    return image[:, :, ::-1]
+
+def rgb_to_gray(image):
+    """Convert RGB to grayscale"""
+    return np.dot(image[..., :3], [0.2989, 0.5870, 0.1140])
+
+def estimate_noise(image):
+    """Estimate noise using gradient analysis"""
+    gray = rgb_to_gray(image)
+    # Calculate gradients
+    gx = np.diff(gray, axis=1, prepend=gray[:, :1])
+    gy = np.diff(gray, axis=0, prepend=gray[:1, :])
+    noise_score = np.mean(np.abs(gx) + np.abs(gy))
+    return min(1.0, noise_score / 100.0)
+
+def estimate_detail_level(image):
+    """Estimate detail level using gradient magnitude"""
+    gray = rgb_to_gray(image)
+    gx = np.diff(gray, axis=1, prepend=gray[:, :1])
+    gy = np.diff(gray, axis=0, prepend=gray[:1, :])
+    gradient_magnitude = np.sqrt(gx**2 + gy**2)
+    return min(1.0, np.mean(gradient_magnitude) / 50.0)
+
+def median_filter(image, kernel_size=3):
     """
-    Adaptive noise reduction that adjusts parameters based on image content and noise levels
+    Apply median filter to reduce noise
     """
-    # Convert to grayscale for analysis
-    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    height, width, channels = image.shape
+    pad = kernel_size // 2
+    result = np.zeros_like(image)
     
-    # Get noise and detail estimates
-    noise_level = estimate_noise(gray)
-    detail_level = estimate_detail_level(gray)
+    # Pad the image
+    padded = np.pad(image, ((pad, pad), (pad, pad), (0, 0)), mode='reflect')
     
-    # Detect faces
-    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-    faces = face_cascade.detectMultiScale(gray, 1.3, 5)
-    
-    # Create a mask for face regions
-    face_mask = np.zeros(gray.shape, dtype=np.uint8)
-    for (x, y, w, h) in faces:
-        face_mask[y:y+h, x:x+w] = 255
-    
-    # Adjust parameters based on noise level and presence of faces
-    if len(faces) > 0:  # If faces detected, use very conservative parameters
-        bilateral_d = 5
-        bilateral_sigma = max(5, int(15 * noise_level))
-        nlm_h = max(3, int(5 * noise_level))
-    else:  # No faces, adjust based on noise and detail levels
-        bilateral_d = 7 if noise_level > 0.5 else 5
-        bilateral_sigma = max(15, int(50 * noise_level))
-        nlm_h = max(5, int(10 * noise_level))
-    
-    # Apply bilateral filter
-    bilateral = cv2.bilateralFilter(
-        image, 
-        d=bilateral_d,
-        sigmaColor=bilateral_sigma,
-        sigmaSpace=bilateral_sigma
-    )
-    
-    # Apply non-local means with adjusted parameters
-    nlm = cv2.fastNlMeansDenoisingColored(
-        bilateral,
-        None,
-        h=nlm_h,
-        hColor=nlm_h,
-        templateWindowSize=5,
-        searchWindowSize=15
-    )
-    
-    # For face regions, blend more of the original image
-    if len(faces) > 0:
-        face_mask_3d = cv2.cvtColor(face_mask, cv2.COLOR_GRAY2RGB)
-        face_blend = cv2.addWeighted(
-            image, 0.6,  # More weight to original in face regions
-            nlm, 0.4,
-            0
-        )
-        non_face_blend = cv2.addWeighted(
-            image, 0.3,  # Less weight to original in non-face regions
-            nlm, 0.7,
-            0
-        )
-        # Combine face and non-face regions
-        result = np.where(
-            face_mask_3d > 0,
-            face_blend,
-            non_face_blend
-        )
-    else:
-        # No faces detected, use standard blending
-        result = cv2.addWeighted(image, 0.4, nlm, 0.6, 0)
+    for i in range(height):
+        for j in range(width):
+            for c in range(channels):
+                window = padded[i:i+kernel_size, j:j+kernel_size, c]
+                result[i, j, c] = np.median(window)
     
     return result
 
-def estimate_noise(gray_img):
+def gaussian_kernel(size, sigma):
     """
-    Estimate noise level in the image
+    Create a Gaussian kernel
     """
-    # Laplacian variance method
-    lap = cv2.Laplacian(gray_img, cv2.CV_64F)
-    noise_score = np.var(lap)
-    # Normalize to 0-1 range
-    return min(1.0, noise_score / 500.0)
-
-def estimate_detail_level(gray_img):
-    """
-    Estimate level of detail in the image
-    """
-    # Use Sobel edges to detect detail
-    sobelx = cv2.Sobel(gray_img, cv2.CV_64F, 1, 0, ksize=3)
-    sobely = cv2.Sobel(gray_img, cv2.CV_64F, 0, 1, ksize=3)
-    gradient_magnitude = np.sqrt(sobelx**2 + sobely**2)
+    kernel = np.zeros((size, size))
+    center = size // 2
     
-    # Calculate detail score
-    detail_score = np.mean(gradient_magnitude)
-    # Normalize to 0-1 range
-    return min(1.0, detail_score / 50.0)
+    for i in range(size):
+        for j in range(size):
+            x, y = i - center, j - center
+            kernel[i, j] = np.exp(-(x**2 + y**2) / (2 * sigma**2))
+    
+    return kernel / kernel.sum()
+
+def bilateral_filter(image, kernel_size=5, sigma_space=30, sigma_color=30):
+    """
+    Custom implementation of bilateral filter
+    """
+    height, width, channels = image.shape
+    pad = kernel_size // 2
+    result = np.zeros_like(image)
+    
+    # Pad the image
+    padded = np.pad(image, ((pad, pad), (pad, pad), (0, 0)), mode='reflect')
+    
+    # Create spatial Gaussian kernel
+    spatial_kernel = gaussian_kernel(kernel_size, sigma_space)
+    
+    for i in range(height):
+        for j in range(width):
+            for c in range(channels):
+                window = padded[i:i+kernel_size, j:j+kernel_size, c]
+                center_value = image[i, j, c]
+                
+                # Color difference Gaussian
+                color_diff = window - center_value
+                color_weight = np.exp(-(color_diff**2) / (2 * sigma_color**2))
+                
+                # Combine spatial and color weights
+                weights = spatial_kernel * color_weight
+                weights = weights / weights.sum()
+                
+                # Apply filter
+                result[i, j, c] = np.sum(window * weights)
+    
+    return result.astype(np.uint8)
+
+def non_local_means(image, search_window=21, patch_size=7, h=10):
+    """
+    Custom implementation of non-local means denoising
+    """
+    height, width, channels = image.shape
+    pad_search = search_window // 2
+    pad_patch = patch_size // 2
+    result = np.zeros_like(image)
+    
+    # Pad the image
+    padded = np.pad(image, ((pad_search, pad_search), (pad_search, pad_search), (0, 0)), mode='reflect')
+    
+    for i in range(height):
+        for j in range(width):
+            i_pad = i + pad_search
+            j_pad = j + pad_search
+            
+            # Extract search window
+            search_area = padded[i_pad-pad_search:i_pad+pad_search+1,
+                               j_pad-pad_search:j_pad+pad_search+1]
+            
+            weights = np.zeros((search_window, search_window))
+            
+            # Reference patch
+            ref_patch = padded[i_pad-pad_patch:i_pad+pad_patch+1,
+                             j_pad-pad_patch:j_pad+pad_patch+1]
+            
+            # Compare patches within search window
+            for si in range(search_window):
+                for sj in range(search_window):
+                    comp_patch = padded[i_pad-pad_search+si-pad_patch:i_pad-pad_search+si+pad_patch+1,
+                                      j_pad-pad_search+sj-pad_patch:j_pad-pad_search+sj+pad_patch+1]
+                    
+                    # Calculate patch difference
+                    diff = np.sum((ref_patch - comp_patch)**2)
+                    weights[si, sj] = np.exp(-diff / h**2)
+            
+            # Normalize weights
+            weights = weights / weights.sum()
+            
+            # Apply weights
+            for c in range(channels):
+                result[i, j, c] = np.sum(search_area[:, :, c] * weights)
+    
+    return result.astype(np.uint8)
+
+def adaptive_noise_reduction(image):
+    """
+    Adaptive noise reduction pipeline using only NumPy operations
+    """
+    # Estimate noise level
+    noise_level = estimate_noise(image)
+    detail_level = estimate_detail_level(image)
+    
+    # Adjust filter parameters based on image characteristics
+    median_size = 3 if noise_level < 0.5 else 5
+    bilateral_sigma = max(10, int(30 * noise_level))
+    nlm_h = max(5, int(15 * noise_level))
+    
+    # Apply filters in sequence
+    median_filtered = median_filter(image, kernel_size=median_size)
+    bilateral_filtered = bilateral_filter(
+        median_filtered, 
+        kernel_size=5,
+        sigma_space=bilateral_sigma,
+        sigma_color=bilateral_sigma
+    )
+    final_result = non_local_means(
+        bilateral_filtered,
+        search_window=11,
+        patch_size=5,
+        h=nlm_h
+    )
+    
+    return final_result
 
 def detect_faces(image):
     """
     Optional: Detect faces to apply different processing to facial regions
     """
-    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
-    faces = face_cascade.detectMultiScale(gray, 1.3, 5)
-    return faces
+    gray = rgb_to_gray(image)
+    edges = cv2.Canny(gray, 100, 200)
+    return edges
 
 

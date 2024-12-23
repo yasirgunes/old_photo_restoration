@@ -1,7 +1,16 @@
-import cv2
+import os
+import sys
+import numpy as np
+
+# Add the project root directory to Python path
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
+from gaussian_filter import gaussian_kernel, apply_gaussian_filter
 
 # Function to apply unsharp masking
-def unsharp_masking(image, kernel_size=(5, 5), sigma=1.0, strength=0.5):
+def unsharp_masking(image, kernel_size=5, sigma=1.0, strength=0.5):
     """
     Apply unsharp masking to enhance edges.
 
@@ -14,9 +23,19 @@ def unsharp_masking(image, kernel_size=(5, 5), sigma=1.0, strength=0.5):
     Returns:
     - Sharpened image (NumPy array).
     """
+    # Create Gaussian kernel
+    kernel = gaussian_kernel(kernel_size, sigma)
+    
     # Generate a blurred version of the image
-    blurred = cv2.GaussianBlur(image, kernel_size, sigma)
+    blurred = apply_gaussian_filter(image, kernel)
     
     # Subtract the blurred image from the original
-    sharpened = cv2.addWeighted(image, 1 + strength, blurred, -strength, 0)
+    mask = image - blurred
+    
+    # Combine the original image with the mask
+    sharpened = image + strength * mask
+    
+    # Clip values to be in the valid range [0, 255]
+    sharpened = np.clip(sharpened, 0, 255).astype(np.uint8)
+    
     return sharpened
