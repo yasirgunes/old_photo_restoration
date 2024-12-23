@@ -1,5 +1,5 @@
 # %%
-import cv2 as cv
+import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -69,9 +69,9 @@ def generate_mask(image):
     # write the image to the path: "mask_generation/input"
 
     # convert RGB to BGR before saving
-    image_bgr = cv.cvtColor(image, cv.COLOR_RGB2BGR)
+    image_bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
-    cv.imwrite(os.path.join(input_dir, "image.png"), image_bgr)
+    cv2.imwrite(os.path.join(input_dir, "image.png"), image_bgr)
 
 
     # Command to execute
@@ -97,7 +97,10 @@ def generate_mask(image):
             print("Error occurred while generating masks:")
             print(e.stderr)
             
-    mask = cv.imread("mask_generation\\output\\mask\\image.png", cv.IMREAD_GRAYSCALE)
+    mask = cv2.imread("mask_generation\\output\\mask\\image.png", cv2.IMREAD_GRAYSCALE)
+    # Ensure mask matches input dimensions
+    if mask.shape[:2] != image.shape[:2]:
+        mask = cv2.resize(mask, (image.shape[1], image.shape[0]))
     return mask
     
 
@@ -138,13 +141,15 @@ def inpaint_scratches(image):
     Returns:
         numpy.ndarray: Inpainted image.
     """
-
+    print("Image shape:", image.shape)
     # generate the mask
     mask = generate_mask(image)
-
+    print("Mask shape:", mask.shape)
     # inpaint the image
-    inpainted_image = cv.inpaint(image, mask, inpaintRadius=3, flags=cv.INPAINT_TELEA)
+    inpainted_image = cv2.inpaint(image, mask, inpaintRadius=3, flags=cv2.INPAINT_TELEA)
 
     return inpainted_image
 
+
+# %%
 

@@ -56,8 +56,11 @@ def adjust_brightness_contrast(image, alpha=1.1, beta=2):
     Returns:
     - Adjusted image (NumPy array).
     """
+    image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+
     # Apply the formula: new_image = alpha * image + beta
     adjusted = cv2.convertScaleAbs(image, alpha=alpha, beta=beta)
+    adjusted = cv2.cvtColor(adjusted, cv2.COLOR_BGR2RGB)
     return adjusted
 
 # # Load the input image
@@ -98,6 +101,9 @@ def equalize_histogram(image, clipLimit=0.5):
     Returns:
     - Equalized image (NumPy array).
     """
+    # if the image is in RGB format, convert it to BGR
+    if len(image.shape) == 3:
+        image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
     # Convert to YUV color space
     image_yuv = cv2.cvtColor(image, cv2.COLOR_BGR2YUV)
