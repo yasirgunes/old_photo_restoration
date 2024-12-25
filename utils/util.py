@@ -151,3 +151,58 @@ def telea_inpaint(image, mask, radius=3):
                         heappush(heap, (new_dist, (ny, nx)))
     
     return image
+
+def gaussian_kernel(size, sigma=1):
+  """Generates a Gaussian kernel manually."""
+  kernel = np.zeros((size, size), dtype=np.float32)
+  center = size // 2
+
+  for x in range(size):
+      for y in range(size):
+          diff = np.square(x - center) + np.square(y - center)
+          kernel[x, y] = np.exp(-diff / (2 * np.square(sigma)))
+
+  return kernel / np.sum(kernel)
+
+# %%
+def apply_gaussian_filter(image, size, sigma):
+    """Applies a Gaussian filter to a colored image using manual convolution."""
+
+    kernel = gaussian_kernel(size, sigma)
+
+    # Get image dimensions
+    if len(image.shape) == 3:
+        image_height, image_width, channels = image.shape
+    else:
+        image_height, image_width = image.shape
+        channels = 1
+
+    kernel_size = kernel.shape[0]
+    pad_width = kernel_size // 2
+
+    # Handle both colored and grayscale images
+    if channels == 1:
+        # Pad the image to handle borders
+        padded_image = np.pad(image, pad_width, mode='constant', constant_values=0)
+        smoothed_image = np.zeros_like(image)
+
+        # Perform convolution
+        for i in range(image_height):
+            for j in range(image_width):
+                region = padded_image[i:i + kernel_size, j:j + kernel_size]
+                smoothed_image[i, j] = np.sum(region * kernel)
+    else:
+        # For colored images, process each channel separately
+        smoothed_image = np.zeros_like(image)
+
+        for c in range(channels):
+            # Pad the channel
+            padded_channel = np.pad(image[:,:,c], pad_width, mode='constant', constant_values=0)
+
+            # Perform convolution for each channel
+            for i in range(image_height):
+                for j in range(image_width):
+                    region = padded_channel[i:i + kernel_size, j:j + kernel_size]
+                    smoothed_image[i, j, c] = np.sum(region * kernel)
+
+    return smoothed_image

@@ -21,17 +21,17 @@ def noise_reduction(image):
     img_noise = rgb_to_bgr(image)
     img_noise_rgb = bgr_to_rgb(img_noise)
 
-    gaussian_blur = cv2.GaussianBlur(img_noise, (5, 5), 0)
-    gaussian_blur_rgb = cv2.cvtColor(gaussian_blur, cv2.COLOR_BGR2RGB)
+    gaussian_blur = apply_gaussian_filter(img_noise, 5, 0)
+    gaussian_blur_rgb = bgr_to_rgb(gaussian_blur)
 
     median_blur = cv2.medianBlur(img_noise, 5)
-    median_blur_rgb = cv2.cvtColor(median_blur, cv2.COLOR_BGR2RGB)
+    median_blur_rgb = bgr_to_rgb(median_blur)
 
     bilateral_filter = cv2.bilateralFilter(img_noise, 9, 75, 75)
-    bilateral_filter_rgb = cv2.cvtColor(bilateral_filter, cv2.COLOR_BGR2RGB)
+    bilateral_filter_rgb = bgr_to_rgb(bilateral_filter)
 
     nonlocal_mean = cv2.fastNlMeansDenoisingColored(img_noise, None, 10, 10, 7, 21)
-    nonlocal_mean_rgb = cv2.cvtColor(nonlocal_mean, cv2.COLOR_BGR2RGB)
+    nonlocal_mean_rgb = bgr_to_rgb(nonlocal_mean)
 
     plt.figure(figsize=(14,8))
     tup = [
