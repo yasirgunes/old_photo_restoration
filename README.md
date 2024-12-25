@@ -66,6 +66,13 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
+Go back to our repository's directory and run the GUI:
+
+```bash
+cd ../
+cd old_photo_restoration
+python GUI.py
+```
 
 ## **Project Overview**
 
