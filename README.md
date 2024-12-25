@@ -4,6 +4,76 @@ Welcome to the **Old Photo Restoration Project**! This project aims to restore o
 
 ---
 
+## Installation
+
+This repository is dependent to some other repositories, so we need to install them first. We need them to automatize mask generation.
+
+First we need to clone this repository in the same folder level of this repository.
+```
+git clone https://github.com/microsoft/Bringing-Old-Photos-Back-to-Life.git
+```
+
+The project folder structure should be like this.
+
+![{F5C77979-DF2E-43AD-9848-C4CA4064DCA7}](https://github.com/user-attachments/assets/460742d1-c7a7-4248-8ef5-752b863673b7)
+
+
+Then, we should enter the directory 'Bringing-Old-Photos-Back-to-Life'.
+
+After that we should do the followings:
+
+Clone the Synchronized-BatchNorm-PyTorch repository for
+
+```
+cd Face_Enhancement/models/networks/
+git clone https://github.com/vacancy/Synchronized-BatchNorm-PyTorch
+cp -rf Synchronized-BatchNorm-PyTorch/sync_batchnorm .
+cd ../../../
+```
+
+```
+cd Global/detection_models
+git clone https://github.com/vacancy/Synchronized-BatchNorm-PyTorch
+cp -rf Synchronized-BatchNorm-PyTorch/sync_batchnorm .
+cd ../../
+```
+
+Download the landmark detection pretrained model
+
+```
+cd Face_Detection/
+wget http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2
+bzip2 -d shape_predictor_68_face_landmarks.dat.bz2
+cd ../
+```
+
+Download the pretrained model, put the file `Face_Enhancement/checkpoints.zip` under `./Face_Enhancement`, and put the file `Global/checkpoints.zip` under `./Global`. Then unzip them respectively.
+
+```
+cd Face_Enhancement/
+wget https://github.com/microsoft/Bringing-Old-Photos-Back-to-Life/releases/download/v1.0/face_checkpoints.zip
+unzip face_checkpoints.zip
+cd ../
+cd Global/
+wget https://github.com/microsoft/Bringing-Old-Photos-Back-to-Life/releases/download/v1.0/global_checkpoints.zip
+unzip global_checkpoints.zip
+cd ../
+```
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+Go back to our repository's directory and run the GUI:
+
+```bash
+cd ../
+cd old_photo_restoration
+python GUI.py
+```
+
 ## **Project Overview**
 
 The project uses Python and popular libraries such as NumPy, Matplotlib, and PIL to implement image restoration from scratch. Techniques include noise reduction, scratch and blemish removal, contrast and brightness adjustments, and sharpness enhancement. Our modular design ensures that each technique is standalone, making it easy to test, refine, and combine into a comprehensive restoration pipeline.
