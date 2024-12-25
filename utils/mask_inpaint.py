@@ -2,6 +2,7 @@
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+from utils.util import *
 
 from contextlib import contextmanager
 import subprocess
@@ -69,7 +70,9 @@ def generate_mask(image):
     # write the image to the path: "mask_generation/input"
 
     # convert RGB to BGR before saving
-    image_bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+    # image_bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR) -- implemented this manually in util.py
+    image_bgr = rgb_to_bgr(image)
+
 
     cv2.imwrite(os.path.join(input_dir, "image.png"), image_bgr)
 
@@ -100,7 +103,8 @@ def generate_mask(image):
     mask = cv2.imread("mask_generation\\output\\mask\\image.png", cv2.IMREAD_GRAYSCALE)
     # Ensure mask matches input dimensions
     if mask.shape[:2] != image.shape[:2]:
-        mask = cv2.resize(mask, (image.shape[1], image.shape[0]))
+        # mask = cv2.resize(mask, (image.shape[1], image.shape[0])) -- implemented this manually in util.py
+        mask = resize_mask(mask, image.shape[0], image.shape[1])
     return mask
     
 
@@ -146,7 +150,8 @@ def inpaint_scratches(image):
     mask = generate_mask(image)
     print("Mask shape:", mask.shape)
     # inpaint the image
-    inpainted_image = cv2.inpaint(image, mask, inpaintRadius=3, flags=cv2.INPAINT_TELEA)
+    # inpainted_image = cv2.inpaint(image, mask, inpaintRadius=3, flags=cv2.INPAINT_TELEA) -- implemented this manually in util.py
+    inpainted_image = telea_inpaint(image, mask)
 
     return inpainted_image
 

@@ -4,6 +4,7 @@ from PIL import Image, ImageTk
 import cv2
 import os
 import threading
+from utils.util import *
 
 class PhotoRestorationGUI:
     def __init__(self, root):
@@ -265,7 +266,7 @@ class PhotoRestorationGUI:
             self.root.after(0, self.display_restored_image, restored)
             
         except Exception as e:
-            self.root.after(0, lambda: messagebox.showerror("Error", f"Error processing image: {str(e)}"))
+            self.root.after(0, lambda err=e: messagebox.showerror("Error", f"Error processing image: {str(err)}"))
         finally:
             self.root.after(0, lambda: self.browse_button.config(
                 state='normal',
