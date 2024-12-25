@@ -16,6 +16,7 @@ git clone https://github.com/microsoft/Bringing-Old-Photos-Back-to-Life.git
 The project folder structure should be like this.
 ![{F5C77979-DF2E-43AD-9848-C4CA4064DCA7}](https://github.com/user-attachments/assets/460742d1-c7a7-4248-8ef5-752b863673b7)
 
+
 Then, we should enter the directory 'Bringing-Old-Photos-Back-to-Life'.
 After that we should do the followings:
 
