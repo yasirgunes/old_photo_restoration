@@ -19,7 +19,7 @@ def display_two_images(image1, image2, title1, title2):
 
     plt.tight_layout()
     plt.show()
-        
+# %%  
 def rgb_to_bgr(image):
     """
     Convert RGB image to BGR manually.
@@ -51,6 +51,17 @@ def rgb_to_gray(image):
     gray = 0.2989 * image[:, :, 0] + 0.5870 * image[:, :, 1] + 0.1140 * image[:, :, 2]
     return gray
 
+def gray_to_rgb(image):
+    """
+    Convert grayscale image to RGB manually.
+    """
+    if len(image.shape) != 2:
+        return image
+        
+    # Create a 3-channel image by duplicating the grayscale values
+    return np.stack((image, image, image), axis=2)
+
+# %%
 def resize_mask(mask, target_height, target_width):
     """
     Manually resize a mask to target dimensions using bilinear interpolation.
@@ -89,7 +100,7 @@ def resize_mask(mask, target_height, target_width):
             resized[y, x] = round(value)
             
     return resized
-
+# %%
 def telea_inpaint(image, mask, radius=3):
     """
     Manual implementation of Telea's inpainting algorithm.
@@ -151,7 +162,7 @@ def telea_inpaint(image, mask, radius=3):
                         heappush(heap, (new_dist, (ny, nx)))
     
     return image
-
+# %%
 def gaussian_kernel(size, sigma=1):
   """Generates a Gaussian kernel manually."""
   kernel = np.zeros((size, size), dtype=np.float32)
@@ -164,7 +175,6 @@ def gaussian_kernel(size, sigma=1):
 
   return kernel / np.sum(kernel)
 
-# %%
 def apply_gaussian_filter(image, size, sigma):
     """Applies a Gaussian filter to a colored image using manual convolution."""
 
@@ -206,3 +216,283 @@ def apply_gaussian_filter(image, size, sigma):
                     smoothed_image[i, j, c] = np.sum(region * kernel)
 
     return smoothed_image
+# %%
+def zero_padding(image, kernel_size):
+    """
+    Apply zero padding to an RGB image without using np.zeros.
+    
+    :param image: The original RGB image as a NumPy array (H x W x 3).
+    :param kernel_size: The size of the kernel (must be odd).
+    :return: The padded RGB image as a manually created NumPy array.
+    """
+    # Compute padding size
+    padding_size = kernel_size // 2
+    
+    # Get original image dimensions
+    original_height, original_width, channels = image.shape
+    
+    # Create the padded image manually
+    padded_height = original_height + 2 * padding_size
+    padded_width = original_width + 2 * padding_size
+    
+    # Initialize the padded image with zeros
+    padded_image = [[[0 for _ in range(channels)] for _ in range(padded_width)] for _ in range(padded_height)]
+    
+    # Copy the original image into the center of the padded image
+    for c in range(channels):
+        for i in range(original_height):
+            for j in range(original_width):
+                padded_image[i + padding_size][j + padding_size][c] = image[i][j][c]
+    
+    # Convert back to a NumPy array
+    return np.array(padded_image, dtype=image.dtype)
+
+def compute_median(region):
+    """
+    Compute the median of a flattened region manually.
+    
+    :param region: The flattened region of interest.
+    :return: The median value.
+    """
+    sorted_region = sorted(region)
+    mid = len(sorted_region) // 2
+    if len(sorted_region) % 2 == 0:
+        # Average of two middle values for even-length list
+        median = (sorted_region[mid - 1] + sorted_region[mid]) // 2
+    else:
+        # Middle value for odd-length list
+        median = sorted_region[mid]
+    return median
+
+
+def median_filter(image, kernel_size=5):
+    """
+    Apply a median filter to the image.
+
+    :param image: The input image as a NumPy array.
+    :param kernel_size: The size of the kernel.
+    :return: The filtered image.
+    """
+    pad_size = kernel_size // 2
+    padded_image = zero_padding(image, kernel_size)
+    height, width, channels = image.shape
+
+    # Initialize an empty filtered image
+    filtered_image = [[[0] * channels for _ in range(width)] for _ in range(height)]
+
+    for c in range(channels):  # Iterate over color channels
+        for i in range(height):  # Iterate over rows
+            for j in range(width):  # Iterate over columns
+                # Extract the region of interest
+                region = padded_image[i:i + kernel_size, j:j + kernel_size, c].flatten()
+                # Compute the median manually
+                filtered_image[i][j][c] = compute_median(region)
+
+    return np.array(filtered_image, dtype=image.dtype)
+# %%
+def bilateral_filter(image, diameter=9, sigma_color=75, sigma_space=75):
+    """
+    Manual implementation of bilateral filter.
+    """
+    padded = np.pad(image, ((diameter//2, diameter//2), (diameter//2, diameter//2), (0, 0)), mode='reflect')
+    result = np.zeros_like(image)
+    
+    radius = diameter // 2
+    space_kernel = np.zeros((diameter, diameter))
+    
+    # Precompute spatial gaussian weights
+    for i in range(diameter):
+        for j in range(diameter):
+            distance = np.sqrt((i-radius)**2 + (j-radius)**2)
+            space_kernel[i, j] = np.exp(-(distance**2) / (2*sigma_space**2))
+    
+    for i in range(radius, padded.shape[0]-radius):
+        for j in range(radius, padded.shape[1]-radius):
+            for c in range(image.shape[2]):
+                window = padded[i-radius:i+radius+1, j-radius:j+radius+1, c]
+                center_val = padded[i, j, c]
+                
+                # Color weights
+                color_diff = window - center_val
+                color_weights = np.exp(-(color_diff**2) / (2*sigma_color**2))
+                
+                # Combined weights
+                weights = color_weights * space_kernel
+                norm_weights = weights / np.sum(weights)
+                
+                # Weighted sum
+                result[i-radius, j-radius, c] = np.sum(window * norm_weights)
+    
+    return result.astype(np.uint8)
+
+# %%
+def nlmeans_denoising(image, h_luminance=10, h_color=10, template_window_size=7, search_window_size=21):
+    """
+    Manual implementation of Non-local Means denoising for colored images.
+    Parameters match OpenCV's fastNlMeansDenoisingColored:
+    h_luminance: Filter strength for luminance component
+    h_color: Filter strength for color components
+    template_window_size: Size of template patch
+    search_window_size: Size of window for searching similar patches
+    """
+    result = np.zeros_like(image)
+    pad_size = search_window_size // 2
+    patch_radius = template_window_size // 2
+    
+    # Convert to YUV-like space for separate luminance/color processing
+    yuv = np.zeros_like(image, dtype=float)
+    yuv[:,:,0] = 0.299 * image[:,:,0] + 0.587 * image[:,:,1] + 0.114 * image[:,:,2]
+    yuv[:,:,1] = image[:,:,2] - yuv[:,:,0]
+    yuv[:,:,2] = image[:,:,0] - yuv[:,:,0]
+    
+    padded = np.pad(yuv, ((pad_size, pad_size), (pad_size, pad_size), (0, 0)), mode='reflect')
+    
+    for i in range(pad_size, padded.shape[0] - pad_size):
+        for j in range(pad_size, padded.shape[1] - pad_size):
+            ref_patch = padded[i-patch_radius:i+patch_radius+1, 
+                             j-patch_radius:j+patch_radius+1]
+            
+            weights_sum = 0
+            pixel_sum = np.zeros(3)
+            
+            for wi in range(i-pad_size, i+pad_size+1):
+                for wj in range(j-pad_size, j+pad_size+1):
+                    if wi == i and wj == j:
+                        continue
+                        
+                    comp_patch = padded[wi-patch_radius:wi+patch_radius+1,
+                                     wj-patch_radius:wj+patch_radius+1]
+                    
+                    # Separate distance computation for luminance and color
+                    dist_y = np.sum((ref_patch[:,:,0] - comp_patch[:,:,0])**2) / template_window_size**2
+                    dist_uv = np.sum((ref_patch[:,:,1:] - comp_patch[:,:,1:])**2) / (2 * template_window_size**2)
+                    
+                    weight = np.exp(-max(dist_y/(h_luminance**2), 0)) * np.exp(-max(dist_uv/(h_color**2), 0))
+                    
+                    weights_sum += weight
+                    pixel_sum += weight * padded[wi, wj]
+            
+            weights_sum += 1
+            pixel_sum += padded[i, j]
+            result[i-pad_size, j-pad_size] = pixel_sum / weights_sum
+    
+    # Convert back to RGB
+    result[:,:,0] = result[:,:,0] + result[:,:,2]
+    result[:,:,2] = result[:,:,0] + result[:,:,1]
+    result = np.clip(result, 0, 255).astype(np.uint8)
+    
+    return result
+
+# %%
+def nlmeans_denoising_colored(image, h, hColor, templateWindowSize, searchWindowSize):
+    result = np.zeros_like(image)
+    pad = searchWindowSize // 2
+    template_radius = templateWindowSize // 2
+    
+    # Convert to YUV
+    yuv = np.zeros_like(image, dtype=float)
+    yuv[..., 0] = 0.299 * image[..., 0] + 0.587 * image[..., 1] + 0.114 * image[..., 2]
+    yuv[..., 1] = image[..., 2] - yuv[..., 0]
+    yuv[..., 2] = image[..., 0] - yuv[..., 0]
+    
+    padded = np.pad(yuv, ((pad, pad), (pad, pad), (0, 0)), mode='reflect')
+    
+    for i in range(pad, padded.shape[0] - pad):
+        for j in range(pad, padded.shape[1] - pad):
+            patch_sums = np.zeros(3)
+            weight_sum = 0
+            
+            ref_patch = padded[i-template_radius:i+template_radius+1,
+                             j-template_radius:j+template_radius+1]
+            
+            # Fixed search window ranges
+            search_start_i = max(pad, i - searchWindowSize//2)
+            search_end_i = min(padded.shape[0] - pad, i + searchWindowSize//2 + 1)
+            search_start_j = max(pad, j - searchWindowSize//2)
+            search_end_j = min(padded.shape[1] - pad, j + searchWindowSize//2 + 1)
+            
+            for wi in range(search_start_i, search_end_i):
+                for wj in range(search_start_j, search_end_j):
+                    if wi == i and wj == j:
+                        continue
+                    
+                    comp_patch = padded[wi-template_radius:wi+template_radius+1,
+                                     wj-template_radius:wj+template_radius+1]
+                    
+                    dist_y = np.sum((ref_patch[..., 0] - comp_patch[..., 0])**2)
+                    dist_uv = np.sum((ref_patch[..., 1:] - comp_patch[..., 1:])**2)
+                    
+                    weight = np.exp(-max(dist_y/(h**2), 0) - max(dist_uv/(hColor**2), 0))
+                    weight_sum += weight
+                    patch_sums += weight * padded[wi, wj]
+            
+            weight_sum += 1
+            patch_sums += padded[i, j]
+            
+            denoised = patch_sums / weight_sum
+            
+            result[i-pad, j-pad, 0] = denoised[0] + denoised[2]
+            result[i-pad, j-pad, 1] = denoised[0]
+            result[i-pad, j-pad, 2] = denoised[0] + denoised[1]
+    
+    return np.clip(result, 0, 255).astype(np.uint8)
+
+# %%
+def add_weighted(img1, alpha, img2, beta, gamma=0):
+    """
+    Manual implementation of weighted image blending
+    """
+    if img1.shape != img2.shape:
+        raise ValueError("Images must have the same shape")
+        
+    result = np.clip(img1.astype(float) * alpha + 
+                    img2.astype(float) * beta + 
+                    gamma, 0, 255).astype(np.uint8)
+    return result
+
+# %%
+def laplacian(img):
+    """Manual Laplacian operator implementation"""
+    kernel = np.array([[0, 1, 0],
+                      [1, -4, 1],
+                      [0, 1, 0]], dtype=np.float64)
+                      
+    padded = np.pad(img, 1, mode='reflect')
+    result = np.zeros_like(img, dtype=np.float64)
+    
+    for i in range(1, padded.shape[0]-1):
+        for j in range(1, padded.shape[1]-1):
+            window = padded[i-1:i+2, j-1:j+2]
+            result[i-1, j-1] = np.sum(window * kernel)
+            
+    return result
+
+# %%
+def sobel(img, dx, dy, ksize=3):
+    """
+    Manual Sobel operator implementation
+    dx, dy: order of derivatives in x,y direction
+    """
+    # Sobel kernels for x and y directions
+    kernel_x = np.array([[-1, 0, 1],
+                        [-2, 0, 2],
+                        [-1, 0, 1]], dtype=np.float64)
+    
+    kernel_y = np.array([[-1, -2, -1],
+                        [0, 0, 0],
+                        [1, 2, 1]], dtype=np.float64)
+    
+    padded = np.pad(img, 1, mode='reflect')
+    result = np.zeros_like(img, dtype=np.float64)
+    
+    if dx == 1:
+        kernel = kernel_x
+    elif dy == 1:
+        kernel = kernel_y
+    
+    for i in range(1, padded.shape[0]-1):
+        for j in range(1, padded.shape[1]-1):
+            window = padded[i-1:i+2, j-1:j+2]
+            result[i-1, j-1] = np.sum(window * kernel)
+            
+    return result

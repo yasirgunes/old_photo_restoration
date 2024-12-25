@@ -12,47 +12,6 @@ from utils.util import *
 
 
 # %%
-def noise_reduction(image):
-    """
-    Apply noise reduction to the image
-    :param image: input image
-    :return: noise reduced image
-    """
-    img_noise = rgb_to_bgr(image)
-    img_noise_rgb = bgr_to_rgb(img_noise)
-
-    gaussian_blur = apply_gaussian_filter(img_noise, 5, 0)
-    gaussian_blur_rgb = bgr_to_rgb(gaussian_blur)
-
-    median_blur = cv2.medianBlur(img_noise, 5)
-    median_blur_rgb = bgr_to_rgb(median_blur)
-
-    bilateral_filter = cv2.bilateralFilter(img_noise, 9, 75, 75)
-    bilateral_filter_rgb = bgr_to_rgb(bilateral_filter)
-
-    nonlocal_mean = cv2.fastNlMeansDenoisingColored(img_noise, None, 10, 10, 7, 21)
-    nonlocal_mean_rgb = bgr_to_rgb(nonlocal_mean)
-
-    plt.figure(figsize=(14,8))
-    tup = [
-        ("Noise Image", img_noise_rgb),
-        ("Gaussian Blur", gaussian_blur_rgb),
-        ("Median Blur", median_blur_rgb),
-        ("Bilateral Filter", bilateral_filter_rgb),
-        ("Non-Local Means", nonlocal_mean_rgb)
-    ]
-
-    for i, (name, img) in enumerate(tup):
-        plt.subplot(2, 3, i+1)
-        plt.imshow(img)
-        plt.title(name)
-        plt.axis('off')
-
-    return nonlocal_mean_rgb
-
-    
-
-# %%
 # noise_reduction("old_photo_02.jpg")
 
 
@@ -60,17 +19,23 @@ def adaptive_noise_reduction(image):
     """
     Adaptive noise reduction that adjusts parameters based on image content and noise levels
     """
+    print("Inside the adaptive_noise_reduction function")
     # Convert to grayscale for analysis
     # gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY) -- implemented this manually in utils/util.py
-    gray = rgb_to_gray(image)
+    # gray = rgb_to_gray(image)
+    gray = rgb_to_gray(image).astype(np.uint8)
+    print("Converted to grayscale")
     
     # Get noise and detail estimates
     noise_level = estimate_noise(gray)
+    print("Estimated noise level")
     detail_level = estimate_detail_level(gray)
+    print("Estimated detail level")
     
     # Detect faces
     face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
     faces = face_cascade.detectMultiScale(gray, 1.3, 5)
+    print("Detected faces")
     
     # Create a mask for face regions
     face_mask = np.zeros(gray.shape, dtype=np.uint8)
@@ -87,13 +52,17 @@ def adaptive_noise_reduction(image):
         bilateral_sigma = max(15, int(50 * noise_level))
         nlm_h = max(5, int(10 * noise_level))
     
+    print("Adjusted parameters to noise level and presence of faces")
     # Apply bilateral filter
-    bilateral = cv2.bilateralFilter(
-        image, 
-        d=bilateral_d,
-        sigmaColor=bilateral_sigma,
-        sigmaSpace=bilateral_sigma
-    )
+    # bilateral = cv2.bilateralFilter(
+    #     image, 
+    #     d=bilateral_d,
+    #     sigmaColor=bilateral_sigma,
+    #     sigmaSpace=bilateral_sigma
+    # )
+    bilateral = bilateral_filter(image, diameter=bilateral_d, sigma_color=bilateral_sigma, sigma_space=bilateral_sigma)
+    print("Applied bilateral filter")
+    
     
     # Apply non-local means with adjusted parameters
     nlm = cv2.fastNlMeansDenoisingColored(
@@ -104,20 +73,27 @@ def adaptive_noise_reduction(image):
         templateWindowSize=5,
         searchWindowSize=15
     )
+    # nlm = nlmeans_denoising_colored(bilateral, h=nlm_h, hColor=nlm_h, templateWindowSize=5, searchWindowSize=15)
+    print("Applied non-local means")
     
     # For face regions, blend more of the original image
+    print("Blending face regions")
     if len(faces) > 0:
-        face_mask_3d = cv2.cvtColor(face_mask, cv2.COLOR_GRAY2RGB)
-        face_blend = cv2.addWeighted(
-            image, 0.6,  # More weight to original in face regions
-            nlm, 0.4,
-            0
-        )
-        non_face_blend = cv2.addWeighted(
-            image, 0.3,  # Less weight to original in non-face regions
-            nlm, 0.7,
-            0
-        )
+        print("Faces detected")
+        face_mask_3d = gray_to_rgb(face_mask)
+        # face_blend = cv2.addWeighted(
+        #     image, 0.6,  # More weight to original in face regions
+        #     nlm, 0.4,
+        #     0
+        # )
+        face_blend = add_weighted(image, 0.6, nlm, 0.4, 0)
+        
+        # non_face_blend = cv2.addWeighted(
+        #     image, 0.3,  # Less weight to original in non-face regions
+        #     nlm, 0.7,
+        #     0
+        # )
+        non_face_blend = add_weighted(image, 0.3, nlm, 0.7, 0)
         # Combine face and non-face regions
         result = np.where(
             face_mask_3d > 0,
@@ -125,8 +101,10 @@ def adaptive_noise_reduction(image):
             non_face_blend
         )
     else:
+        print("No faces detected")
         # No faces detected, use standard blending
-        result = cv2.addWeighted(image, 0.4, nlm, 0.6, 0)
+        # result = cv2.addWeighted(image, 0.4, nlm, 0.6, 0)
+        result = add_weighted(image, 0.4, nlm, 0.6, 0)
     
     return result
 
@@ -135,7 +113,8 @@ def estimate_noise(gray_img):
     Estimate noise level in the image
     """
     # Laplacian variance method
-    lap = cv2.Laplacian(gray_img, cv2.CV_64F)
+    # lap = cv2.Laplacian(gray_img, cv2.CV_64F)
+    lap = laplacian(gray_img)
     noise_score = np.var(lap)
     # Normalize to 0-1 range
     return min(1.0, noise_score / 500.0)
@@ -145,8 +124,10 @@ def estimate_detail_level(gray_img):
     Estimate level of detail in the image
     """
     # Use Sobel edges to detect detail
-    sobelx = cv2.Sobel(gray_img, cv2.CV_64F, 1, 0, ksize=3)
-    sobely = cv2.Sobel(gray_img, cv2.CV_64F, 0, 1, ksize=3)
+    # sobelx = cv2.Sobel(gray_img, cv2.CV_64F, 1, 0, ksize=3)
+    sobelx = sobel(gray_img, 1, 0, ksize=3)
+    # sobely = cv2.Sobel(gray_img, cv2.CV_64F, 0, 1, ksize=3)
+    sobely = sobel(gray_img, 0, 1, ksize=3)
     gradient_magnitude = np.sqrt(sobelx**2 + sobely**2)
     
     # Calculate detail score
@@ -159,7 +140,7 @@ def detect_faces(image):
     Optional: Detect faces to apply different processing to facial regions
     """
     face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    gray = rgb_to_gray(image).astype(np.uint8)
     faces = face_cascade.detectMultiScale(gray, 1.3, 5)
     return faces
 
