@@ -53,21 +53,28 @@ def pipeline(image, *, status_callback=None):  # Use keyword-only argument
     if status_callback:
         status_callback("Removing scratches...")
     scratches_removed = inpaint_scratches(image)
+    print("\n\nRemoved scratches successfully\n\n")
     
     if status_callback:
         status_callback("Implementing noise reduction...")
     noise_reduced = adaptive_noise_reduction(scratches_removed)
+    print("\n\nReduced noise successfully\n\n")
     
     if status_callback:
         status_callback("Equalizing histogram...")
     hist_eq = equalize_histogram(noise_reduced)
+    print("\n\nEqualized histogram successfully\n\n")
     
     if status_callback:
         status_callback("Adjusting sharpness...")
+    print("\n\nAdjusting sharpness...\n\n")
+    print("The type of hist_eq is: ", type(hist_eq))
     sharpened = unsharp_masking(hist_eq)
+    print("\n\nAdjusted sharpness successfully\n\n")
     
     if status_callback:
         status_callback("Adjusting brightness and contrast...")
     brightness_contrast = adjust_brightness_contrast(sharpened)
+    print("\n\nAdjusted brightness and contrast successfully\n\n")
     
     return brightness_contrast

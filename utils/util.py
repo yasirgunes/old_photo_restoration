@@ -61,6 +61,50 @@ def gray_to_rgb(image):
     # Create a 3-channel image by duplicating the grayscale values
     return np.stack((image, image, image), axis=2)
 
+def rgb_to_yuv(image):
+    """
+    Convert RGB image to YUV manually.
+    """
+    if len(image.shape) != 3 or image.shape[2] != 3:
+        return image
+        
+    yuv = np.zeros_like(image, dtype=np.float32)
+    # Y channel
+    yuv[:, :, 0] = 0.299 * image[:, :, 0] + 0.587 * image[:, :, 1] + 0.114 * image[:, :, 2]
+    # U channel
+    yuv[:, :, 1] = -0.147 * image[:, :, 0] - 0.289 * image[:, :, 1] + 0.436 * image[:, :, 2]
+    # V channel
+    yuv[:, :, 2] = 0.615 * image[:, :, 0] - 0.515 * image[:, :, 1] - 0.100 * image[:, :, 2]
+    return yuv
+
+def yuv_to_rgb(image):
+    """
+    Convert YUV image to RGB manually.
+    """
+    if len(image.shape) != 3 or image.shape[2] != 3:
+        return image
+        
+    rgb = np.zeros_like(image, dtype=np.float32)
+    # Red channel
+    rgb[:, :, 0] = image[:, :, 0] + 1.140 * image[:, :, 2]
+    # Green channel
+    rgb[:, :, 1] = image[:, :, 0] - 0.395 * image[:, :, 1] - 0.581 * image[:, :, 2]
+    # Blue channel
+    rgb[:, :, 2] = image[:, :, 0] + 2.032 * image[:, :, 1]
+    return rgb
+
+def bgr_to_yuv(image):
+    """
+    Convert BGR image to YUV manually.
+    """
+    return rgb_to_yuv(bgr_to_rgb(image))
+
+def yuv_to_bgr(image):
+    """
+    Convert YUV image to BGR manually.
+    """
+    return rgb_to_bgr(yuv_to_rgb(image))
+
 # %%
 def resize_mask(mask, target_height, target_width):
     """
@@ -384,3 +428,15 @@ def sobel(img, dx, dy, ksize=3):
             result[i-1, j-1] = np.sum(window * kernel)
             
     return result
+
+# %%
+def convert_scale_abs(image, alpha=1.0, beta=0):
+    """Manual implementation of convertScaleAbs"""
+    # Scale with alpha and add beta
+    scaled = image.astype(float) * alpha + beta
+    
+    # Take absolute values
+    abs_scaled = np.abs(scaled)
+    
+    # Clip to uint8 range and convert
+    return np.clip(abs_scaled, 0, 255).astype(np.uint8)
