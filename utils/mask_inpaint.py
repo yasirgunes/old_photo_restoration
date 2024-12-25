@@ -1,139 +1,29 @@
-import os
-import subprocess
+# %%
+import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from utils.util import *
 
 from contextlib import contextmanager
+import subprocess
+import os
+import shutil
 
-# Simple PPM image writer for RGB images (no alpha)
-def save_ppm(filepath, image_rgb):
-    """
-    Save an image in raw PPM format (P6).
-    image_rgb is assumed to be a NumPy-like 3D list: [height][width][3].
-    """
-    height = len(image_rgb)
-    width = len(image_rgb[0]) if height > 0 else 0
-    with open(filepath, "wb") as f:
-        f.write(f"P6\n{width} {height}\n255\n".encode("ascii"))
-        for row in image_rgb:
-            for pixel in row:
-                # Each pixel is [R, G, B]
-                # Ensure values are in 0-255
-                r = max(0, min(255, pixel[0]))
-                g = max(0, min(255, pixel[1]))
-                b = max(0, min(255, pixel[2]))
-                f.write(bytes([r, g, b]))
+# # %%
+# # Load the image
+# img = cv.imread("photos\\old_w_scratch\\d.png", cv.IMREAD_COLOR)
+# # Convert the image to RGB
+# img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
 
-# Simple PPM reader for grayscale images (P5)
-def load_pgm(filepath):
-    """
-    Load a grayscale image in PGM format (P5).
-    Returns a 2D list (height x width) of integer pixel values in [0..255].
-    """
-    with open(filepath, "rb") as f:
-        header = f.readline().decode("ascii").strip()  # e.g. "P5"
-        if header != "P5":
-            raise ValueError("Not a valid P5 PGM file")
-        # Skip comment lines if any
-        line = f.readline().decode("ascii").strip()
-        while line.startswith("#"):
-            line = f.readline().decode("ascii").strip()
-        # Now line should have width & height
-        width, height = map(int, line.split())
-        maxval = int(f.readline().decode("ascii").strip())  # typically 255
-        # Read pixel data
-        data = f.read(width * height)
-        # Build 2D list
-        image_gray = []
-        idx = 0
-        for _ in range(height):
-            row = []
-            for _ in range(width):
-                row.append(data[idx])
-                idx += 1
-            image_gray.append(row)
-        return image_gray
+# # Check if the image was loaded successfully
+# if img is None:
+#     raise FileNotFoundError("The image file could not be found or loaded.")
 
-def rgb_to_bgr(image_rgb):
-    """
-    Convert an image from RGB to BGR by manually swapping channels.
-    image_rgb is 3D: [height][width][3].
-    """
-    height = len(image_rgb)
-    width = len(image_rgb[0]) if height > 0 else 0
-    image_bgr = []
-    for i in range(height):
-        row = []
-        for j in range(width):
-            r, g, b = image_rgb[i][j]
-            row.append([b, g, r])  # swapped
-        image_bgr.append(row)
-    return image_bgr
 
-# Minimal (very naive) scratch inpainting that just copies neighbors
-def naive_inpaint(image_rgb, mask_gray):
-    """
-    Naive inpainting: for each nonzero mask pixel, replace it with average of valid neighbors.
-    This is a placeholder for demonstration.
-    """
-    height = len(image_rgb)
-    width = len(image_rgb[0]) if height > 0 else 0
-    # Convert to floats for averaging
-    new_image = [[[float(c) for c in pixel] for pixel in row] for row in image_rgb]
-
-    for i in range(height):
-        for j in range(width):
-            if mask_gray[i][j] > 10:  # threshold for "scratch"
-                neighbors = []
-                for di in [-1, 0, 1]:
-                    for dj in [-1, 0, 1]:
-                        ni = i + di
-                        nj = j + dj
-                        if 0 <= ni < height and 0 <= nj < width and mask_gray[ni][nj] <= 10:
-                            neighbors.append(new_image[ni][nj])
-                if neighbors:
-                    avg_r = sum(p[0] for p in neighbors) / len(neighbors)
-                    avg_g = sum(p[1] for p in neighbors) / len(neighbors)
-                    avg_b = sum(p[2] for p in neighbors) / len(neighbors)
-                    new_image[i][j] = [avg_r, avg_g, avg_b]
-
-    # Clip and convert back to int
-    for i in range(height):
-        for j in range(width):
-            new_image[i][j] = [
-                min(255, max(0, int(new_image[i][j][0]))),
-                min(255, max(0, int(new_image[i][j][1]))),
-                min(255, max(0, int(new_image[i][j][2]))),
-            ]
-    return new_image
-
-def load_image_rgb(path):
-    """
-    Load image from disk in BGR, convert manually to RGB, and return as a list of lists.
-    """
-    bgr_img = cv.imread(path)  # allowed for loading
-    if bgr_img is None:
-        raise FileNotFoundError(f"Could not load image at {path}")
-    # Convert to RGB
-    height, width, _ = bgr_img.shape
-    image_rgb = []
-    for i in range(height):
-        row = []
-        for j in range(width):
-            b, g, r = bgr_img[i, j]
-            row.append([r, g, b])
-        image_rgb.append(row)
-    return image_rgb
-
-def show_image_rgb(image_rgb):
-    """
-    Display an RGB image using matplotlib.pyplot (allowed for showing).
-    """
-    arr = np.array(image_rgb, dtype=np.uint8)
-    plt.imshow(arr)
-    plt.axis('off')
-    plt.show()
+# # %%
+# # display the image with matplotlib
+# plt.imshow(img)
+# plt.show()
 
 # %%
 @contextmanager
@@ -151,31 +41,31 @@ def temporary_directory_change(directory):
 # now we need to create a mask for the scratch
 # we will create it with using a trained model
 
-def generate_mask(image_rgb):
+def generate_mask(image):
     """
     Automates the mask generation process using the Bringing-Old-Photos-Back-to-Life repository.
 
+    Parameters:
+        test_path (str): Path to the input images.
+        output_dir (str): Path where output masks will be saved.
+        input_size (str): Size of the input image, default is 'full_size'.
+        gpu (str): GPU setting, default is '-1' (use CPU).
     """
-    # Convert from RGB to BGR
-    image_bgr = rgb_to_bgr(image_rgb)
 
-    # Save the image as PPM
+    # get the full path of the directories in the 'mask_generation' folder
+    # get the full path of the directory 'input' in the 'mask_generation'
     input_dir = os.path.abspath("mask_generation\\input")
+    # get the full path of the directory 'output' in the 'mask_generation'
     output_dir = os.path.abspath("mask_generation\\output")
-    if os.path.exists(input_dir):
+
+
+    # remove the content inside these directories
+    for directory in [input_dir, output_dir]:
         try:
-            import shutil
-            shutil.rmtree(input_dir)
-            os.makedirs(input_dir)
+            shutil.rmtree(directory)
+            os.makedirs(directory)
         except PermissionError:
-            pass
-    if os.path.exists(output_dir):
-        try:
-            import shutil
-            shutil.rmtree(output_dir)
-            os.makedirs(output_dir)
-        except PermissionError:
-            pass
+            print(f"Permission denied: {directory}")
 
     # write the image to the path: "mask_generation/input"
 
@@ -187,7 +77,7 @@ def generate_mask(image_rgb):
     cv2.imwrite(os.path.join(input_dir, "image.png"), image_bgr)
 
 
-    # Run the external detection script
+    # Command to execute
     command = [
         "python",
         "detection.py",
@@ -196,6 +86,8 @@ def generate_mask(image_rgb):
         "--input_size", "full_size",
         "--GPU", "-1"
     ]
+    
+    # Change directory to the script's location
     script_dir = r"C:\\Users\\yasir\\Desktop\\image_project\\Bringing-Old-Photos-Back-to-Life\\Global"
     
     # Run the command
@@ -245,7 +137,13 @@ def generate_mask(image_rgb):
 # # %%
 def inpaint_scratches(image):
     """
-    Inpaints the scratches in the input image using a naive approach.
+    Inpaints the scratches in the input image.
+
+    Parameters:
+        image (numpy.ndarray): Input image with scratches.
+
+    Returns:
+        numpy.ndarray: Inpainted image.
     """
     print("Image shape:", image.shape)
     # generate the mask

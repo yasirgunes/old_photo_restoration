@@ -14,7 +14,6 @@ from utils.util import *
 # %%
 # noise_reduction("old_photo_02.jpg")
 
-import numpy as np
 
 def adaptive_noise_reduction(image):
     """
@@ -106,11 +105,11 @@ def adaptive_noise_reduction(image):
         # result = cv2.addWeighted(image, 0.4, nlm, 0.6, 0)
         result = add_weighted(image, 0.4, nlm, 0.6, 0)
     
-    return result.astype(np.uint8)
+    return result
 
-def adaptive_noise_reduction(image):
+def estimate_noise(gray_img):
     """
-    Adaptive noise reduction pipeline using only NumPy operations
+    Estimate noise level in the image
     """
     # Laplacian variance method
     # lap = cv2.Laplacian(gray_img, cv2.CV_64F)
