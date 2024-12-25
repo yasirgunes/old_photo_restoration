@@ -3,6 +3,7 @@
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+from utils.util import *
 
 # from utils.adjust_sharpness import unsharp_masking
 # from utils.histogrameq_contrast_brightness import equalize_histogram, adjust_brightness_contrast
@@ -17,8 +18,8 @@ def noise_reduction(image):
     :param image: input image
     :return: noise reduced image
     """
-    img_noise = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-    img_noise_rgb = cv2.cvtColor(img_noise, cv2.COLOR_BGR2RGB)
+    img_noise = rgb_to_bgr(image)
+    img_noise_rgb = bgr_to_rgb(img_noise)
 
     gaussian_blur = cv2.GaussianBlur(img_noise, (5, 5), 0)
     gaussian_blur_rgb = cv2.cvtColor(gaussian_blur, cv2.COLOR_BGR2RGB)
@@ -60,7 +61,8 @@ def adaptive_noise_reduction(image):
     Adaptive noise reduction that adjusts parameters based on image content and noise levels
     """
     # Convert to grayscale for analysis
-    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    # gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY) -- implemented this manually in utils/util.py
+    gray = rgb_to_gray(image)
     
     # Get noise and detail estimates
     noise_level = estimate_noise(gray)

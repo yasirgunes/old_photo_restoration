@@ -34,6 +34,23 @@ def rgb_to_bgr(image):
     # Green stays the same
     return bgr
 
+def bgr_to_rgb(image):
+    """
+    Convert BGR image to RGB manually.
+    """
+    return rgb_to_bgr(image)
+
+def rgb_to_gray(image):
+    """
+    Convert RGB image to grayscale manually.
+    """
+    if len(image.shape) != 3 or image.shape[2] != 3:
+        return image
+        
+    # Luminance formula
+    gray = 0.2989 * image[:, :, 0] + 0.5870 * image[:, :, 1] + 0.1140 * image[:, :, 2]
+    return gray
+
 def resize_mask(mask, target_height, target_width):
     """
     Manually resize a mask to target dimensions using bilinear interpolation.
