@@ -54,9 +54,9 @@ def generate_mask(image):
 
     # get the full path of the directories in the 'mask_generation' folder
     # get the full path of the directory 'input' in the 'mask_generation'
-    input_dir = os.path.abspath("mask_generation\\input")
+    input_dir = os.path.abspath(os.path.join("mask_generation", "input"))
     # get the full path of the directory 'output' in the 'mask_generation'
-    output_dir = os.path.abspath("mask_generation\\output")
+    output_dir = os.path.abspath(os.path.join("mask_generation", "output"))
 
 
     # remove the content inside these directories
@@ -88,7 +88,9 @@ def generate_mask(image):
     ]
     
     # Change directory to the script's location
-    script_dir = r"C:\\Users\\yasir\\Desktop\\image_project\\Bringing-Old-Photos-Back-to-Life\\Global"
+    # script_dir = r"C:\\Users\\yasir\\Desktop\\image_project\\Bringing-Old-Photos-Back-to-Life\\Global"
+    print("The current path: ", os.getcwd())
+    script_dir = os.path.join("..", "Bringing-Old-Photos-Back-to-Life", "Global")
     
     # Run the command
     with temporary_directory_change(script_dir):
@@ -100,7 +102,8 @@ def generate_mask(image):
             print("Error occurred while generating masks:")
             print(e.stderr)
             
-    mask = cv2.imread("mask_generation\\output\\mask\\image.png", cv2.IMREAD_GRAYSCALE)
+    # mask = cv2.imread("mask_generation\\output\\mask\\image.png", cv2.IMREAD_GRAYSCALE)
+    mask = cv2.imread(os.path.join(output_dir, "mask", "image.png"), cv2.IMREAD_GRAYSCALE)
     # Ensure mask matches input dimensions
     if mask.shape[:2] != image.shape[:2]:
         # mask = cv2.resize(mask, (image.shape[1], image.shape[0])) -- implemented this manually in util.py
