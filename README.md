@@ -110,10 +110,3 @@ The project uses Python and popular libraries such as NumPy, Matplotlib, and PIL
    - Prepare a comprehensive presentation and report detailing the methods, results, and challenges.
 
 ---
-
-## **Installation**
-
-1. **Clone the Repository**
-   ```bash
-   git clone https://github.com/YourUsername/Old-Photo-Restoration.git
-   cd Old-Photo-Restoration
