@@ -73,7 +73,6 @@ def adaptive_noise_reduction(image):
         templateWindowSize=5,
         searchWindowSize=15
     )
-    # nlm = nlmeans_denoising_colored(bilateral, h=nlm_h, hColor=nlm_h, templateWindowSize=5, searchWindowSize=15)
     print("Applied non-local means")
     
     # For face regions, blend more of the original image
