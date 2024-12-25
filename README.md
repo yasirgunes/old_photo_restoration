@@ -19,6 +19,7 @@ The project folder structure should be like this.
 
 
 Then, we should enter the directory 'Bringing-Old-Photos-Back-to-Life'.
+
 After that we should do the followings:
 
 Clone the Synchronized-BatchNorm-PyTorch repository for
