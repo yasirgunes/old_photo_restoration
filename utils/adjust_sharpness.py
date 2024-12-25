@@ -16,7 +16,7 @@ def unsharp_masking(image, kernel_size=5, sigma=1.0, strength=0.5):
     - Sharpened image (NumPy array).
     """
     # Generate a blurred version of the image
-    # blurred = cv2.GaussianBlur(image, kernel_size, sigma)
+    # blurred = cv2.GaussianBlur(image, (kernel_size, kernel_size), sigma)
     blurred = apply_gaussian_filter(image, kernel_size, sigma)
     
     # Subtract the blurred image from the original
